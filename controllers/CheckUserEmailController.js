@@ -19,7 +19,7 @@ const CheckEmailController = (request, response) => {
             if (results.length > 0) {
                 return response.status(200).json({
                     status: 'success',
-                    message: 'User available!'
+                    message: 'Email sent for password reset!'
                 })
             } else{
                 return response.status(200).json({

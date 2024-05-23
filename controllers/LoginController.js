@@ -2,7 +2,6 @@ const connection = require('./../model/connection')
 
 const LoginController = (request, response) => {
     const {email, password} = request.body
-    console.log(request.body)
     if (!email || !password) {
         response.status(200).json({
             status: "error",
@@ -21,7 +20,8 @@ const LoginController = (request, response) => {
             if (results.length > 0) {
                 return response.status(200).json({
                     status: 'success',
-                    message: 'Login success!'
+                    message: 'Login success!',
+                    data: results
                 })
             } else{
                 return response.status(200).json({
