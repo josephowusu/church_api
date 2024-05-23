@@ -4,7 +4,7 @@ const connection = require('./../model/connection')
 
 const RegisterController = (request, response) => {
     const {firstname, othername, lastname, email, password, session} = request.body
-    console.log(request.body)
+    
     if (!firstname || !lastname || !email || !password) {
         response.status(200).json({
             status: "error",

@@ -1,14 +1,21 @@
 const path = require('path')
 const dotenv = require('dotenv')
 const express = require('express')
-const app = express()
-const port = 3030
+const cors = require('cors')
 const bodyParser = require('body-parser')
 const RegisterController = require('./controllers/RegisterController')
 const LoginController = require('./controllers/LoginController')
 const CheckEmailController = require('./controllers/CheckUserEmailController')
 const ChangePasswordController = require('./controllers/ChangePasswordController')
+
+const app = express()
+const port = 3030
 dotenv.config({ path: path.join(__dirname, `.env`)})
+
+app.use(cors({
+    origin: "*",
+    methods: ['GET', 'POST', 'DELETE', 'PUT']
+}))
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 
@@ -20,25 +27,29 @@ app.get('/', (req, res) => {
 })
 
 app.post('/register_user', (req, res) => {
+    console.log('Received request to register user')
     RegisterController(req, res)
 })
 
 app.post('/login_user', (req, res) => {
+    console.log('Received request to login user')
     LoginController(req, res)
 })
 
 app.post('/check_user_email', (req, res) => {
+    console.log('Received request to check user email')
     CheckEmailController(req, res)
 })
 
 app.post('/change_user_password', (req, res) => {
+    console.log('Received request to change user password')
     ChangePasswordController(req, res)
 })
 
 app.listen(port, (error) => { 
-    if(!error) {
-        console.log("Server is Successfully Running, and App is listening on port "+ port) 
+    if (!error) {
+        console.log(`Server is Successfully Running\nListening on port ${port}`)
     } else {
-        console.log("Error occurred, server can't start", error); 
-    } 
+        console.log("Error occurred, server can't start", error)
+    }
 })
