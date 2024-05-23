@@ -1,11 +1,12 @@
 const mysql = require('mysql');
+const config = require('./setup');
 
 const pool = mysql.createPool({
     connectionLimit : 10,
-    host: 'localhost',
-    user: 'root',
-    password: '',
-    database: 'acciportal_database'
+    host: config.host,
+    user: config.user,
+    password: config.password,
+    database: config.database
 })
 
 module.exports = {
