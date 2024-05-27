@@ -7,6 +7,9 @@ const RegisterController = require('./controllers/RegisterController')
 const LoginController = require('./controllers/LoginController')
 const CheckEmailController = require('./controllers/CheckUserEmailController')
 const ChangePasswordController = require('./controllers/ChangePasswordController')
+const { createServer } = require("http")
+const { Server } = require("socket.io")
+const httpServer = createServer()
 
 const app = express()
 const port = 3030
@@ -18,6 +21,13 @@ app.use(cors({
 }))
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
+
+const io = new Server(httpServer, {
+    cors: {
+      origin: "*",
+      methods: ['GET', 'POST', 'DELETE', 'PUT']
+    }
+})
 
 app.get('/', (req, res) => {
     res.status(200).json({
@@ -32,7 +42,6 @@ app.post('/register_user', (req, res) => {
 })
 
 app.post('/login_user', (req, res) => {
-    console.log('Received request to login user')
     LoginController(req, res)
 })
 
