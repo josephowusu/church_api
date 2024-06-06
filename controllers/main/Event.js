@@ -4,7 +4,7 @@
 const { generateID, fullDateTime, fullDate } = require('../../model/helper')
 const connection = require('./../../model/connection')
 
-const OfferingsController = (data, type, callback, socket) => {
+const EventController = (data, type, callback, socket) => {
     if (type === "insert") {
         insert(data, callback, socket)
     } else if (type === "fetch") {
@@ -13,8 +13,8 @@ const OfferingsController = (data, type, callback, socket) => {
 }
 
 async function insert(data, callback, socket) {
-    const { memberID, amount, sessionID } = data
-    if (!memberID || !amount) {
+    const { title, content, files, sessionID } = data
+    if (!title || !content) {
         callback({
             status: 'error',
             message: 'Required fields'
@@ -22,7 +22,7 @@ async function insert(data, callback, socket) {
         return
     }
     connection.getConnection((err, conn) => {
-        const sql = `INSERT INTO offerings 
+        const sql = `INSERT INTO events 
         (id, userID, amount, status, sessionID, createdAt) 
         VALUES (?, ?, ?, ?, ?, ?)`
         const queryValues = [
@@ -36,11 +36,11 @@ async function insert(data, callback, socket) {
                 })
                 return
             }
-            socket.broadcast.emit('/offerings/broadcast', 'success')
-            socket.emit('/offerings/broadcast', 'success')
+            socket.broadcast.emit('/dues/broadcast', 'success')
+            socket.emit('/dues/broadcast', 'success')
             callback({
                 status: 'success',
-                message: 'Offering added successfully!'
+                message: 'Dues added successfully!'
             })
         })
         conn.release()
@@ -50,7 +50,7 @@ async function insert(data, callback, socket) {
 async function fetch(data, callback) {
     const {name, limit, offset} = data
     connection.getConnection((err, conn) => {
-        const sql = 'SELECT * FROM offerings LIMIT ? OFFSET ?';
+        const sql = 'SELECT * FROM dues LIMIT ? OFFSET ?';
         const queryValues = [limit || 10, offset || 0]
         conn.query(sql, queryValues, (err, results) => {
             if (err) {
@@ -82,4 +82,4 @@ async function fetch(data, callback) {
     })
 }
 
-module.exports = OfferingsController
+module.exports = EventController

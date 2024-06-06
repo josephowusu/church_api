@@ -1,18 +1,18 @@
 
 
 const { generateID, fullDateTime } = require('../../model/helper')
-const connection = require('./../model/connection')
+const connection = require('./../../model/connection')
 
-const OrganisationController = (data, type, callback) => {
+const OrganisationController = (data, type, callback, socket) => {
     if (type === "insert") {
-        insert(data, callback)
+        insert(data, callback, socket)
     } else if (type === "fetch") {
         fetch(data, callback)
     }
 }
 
-async function insert(data, callback) {
-    const {name, description, session} = data
+async function insert(data, callback, socket) {
+    const {name, description, sessionID} = data
     if (!name) {
         callback({
             status: 'error',
@@ -39,7 +39,7 @@ async function insert(data, callback) {
             (id, name, description, status, sessionID, createdAt) 
             VALUES (?, ?, ?, ?, ?, ?)`
             const queryValues = [
-                generateID(), name, description ? description : '', 'active', session ? session : null, fullDateTime()
+                generateID(), name, description ? description : '', 'active', sessionID ? sessionID : null, fullDateTime()
             ]
             conn.query(sql, queryValues, (err, results) => {
                 if (err) {
@@ -49,6 +49,8 @@ async function insert(data, callback) {
                     })
                     return
                 }
+                socket.broadcast.emit('/organisation/broadcast', 'success')
+                socket.emit('/organisation/broadcast', 'success')
                 callback({
                     status: 'success',
                     message: 'Organisation successfully created!'

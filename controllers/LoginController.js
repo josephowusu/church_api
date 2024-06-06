@@ -9,6 +9,7 @@ const LoginController = (request, response) => {
         })
         return
     }
+    console.log(email, password)
     connection.getConnection((err, conn) => {
         conn.query('SELECT * FROM users WHERE email = ? AND password = ?', [email, password], (error, results, fields) => {
             if (error) {

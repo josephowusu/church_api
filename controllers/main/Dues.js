@@ -1,18 +1,19 @@
 
 
-const connection = require('./../model/connection')
-const { generateID, fullDateTime } = require('../../model/helper')
 
-const DuesController = (data, type, callback) => {
+const { generateID, fullDateTime, fullDate } = require('../../model/helper')
+const connection = require('./../../model/connection')
+
+const DuesController = (data, type, callback, socket) => {
     if (type === "insert") {
-        insert(data, callback)
+        insert(data, callback, socket)
     } else if (type === "fetch") {
         fetch(data, callback)
     }
 }
 
-async function insert(data, callback) {
-    const { memberID, amount, session } = data
+async function insert(data, callback, socket) {
+    const { memberID, amount, sessionID } = data
     if (!memberID || !amount) {
         callback({
             status: 'error',
@@ -22,10 +23,10 @@ async function insert(data, callback) {
     }
     connection.getConnection((err, conn) => {
         const sql = `INSERT INTO dues 
-        (id, memberID, amount, status, sessionID, createdAt) 
+        (id, userID, amount, status, sessionID, createdAt) 
         VALUES (?, ?, ?, ?, ?, ?)`
         const queryValues = [
-            generateID(), memberID, amount, 'active', session ? session : null, fullDateTime()
+            generateID(), memberID.split('**')[1], amount, 'active', sessionID ? sessionID : null, fullDateTime()
         ]
         conn.query(sql, queryValues, (err, results) => {
             if (err) {
@@ -35,6 +36,8 @@ async function insert(data, callback) {
                 })
                 return
             }
+            socket.broadcast.emit('/dues/broadcast', 'success')
+            socket.emit('/dues/broadcast', 'success')
             callback({
                 status: 'success',
                 message: 'Dues added successfully!'
@@ -57,9 +60,22 @@ async function fetch(data, callback) {
                 })
                 return
             }
+            let resultOver = {}
+            if (results.length > 0) {
+                for (let i = 0; i < results.length; i++) {
+                    const item = results[i]
+                    const dateTime = item.createdAt
+                    let date = fullDate(dateTime)
+                    if (!resultOver[date]) {
+                        resultOver[date] = [item]
+                    } else {
+                        resultOver[date].push(item)
+                    }
+                }
+            }
             callback({
                 status: 'success',
-                data: results
+                data: resultOver
             })
         })
         conn.release()

@@ -3,18 +3,20 @@
 const { generateID, fullDateTime } = require('../../model/helper')
 const connection = require('./../../model/connection')
 
-const DepartmentController = (data, type, callback, socket) => {
+const MemberController = (data, type, callback, socket) => {
     if (type === "insert") {
         insert(data, callback, socket)
     } else if (type === "fetch") {
         fetch(data, callback)
+    } else if (type === "fetchWithDetails") {
+        fetchMemberDetail(data, callback)
     }
 }
 
 
 async function insert(data, callback, socket) {
-    const {name, description, session} = data
-    if (!name) {
+    const {firstName, otherName, lastName, email, phone, type, password, sessionID} = data
+    if (!firstName || !lastName || !email) {
         callback({
             status: 'error',
             message: 'Required fields'
@@ -22,7 +24,7 @@ async function insert(data, callback, socket) {
         return
     }
     connection.getConnection((err, conn) => {
-        conn.query('SELECT * FROM department WHERE name = ?', [name], (error, results, fields) => {
+        conn.query('SELECT * FROM users WHERE email = ?', [email], (error, results, fields) => {
             if (error) {
                 callback({
                     status: 'error',
@@ -33,15 +35,15 @@ async function insert(data, callback, socket) {
             if (results.length > 0) {
                 callback({
                     status: 'error',
-                    message: 'Department already exists!'
+                    message: 'User already exists!'
                 })
                 return
             }
-            const sql = `INSERT INTO department 
-            (id, name, description, status, sessionID, createdAt) 
-            VALUES (?, ?, ?, ?, ?, ?)`
+            const sql = `INSERT INTO users 
+            (id, firstName, otherName, lastName, email, password, type, status, sessionID, createdAt) 
+            VALUES (?, ?, ?, ?, ?, ? ,? ,? ,? , ?)`
             const queryValues = [
-                generateID(), name, description ? description : '', 'active', session ? session : null, fullDateTime()
+                generateID(), firstName, otherName, lastName, email, password, type, 'active', sessionID ? sessionID : null, fullDateTime()
             ]
             conn.query(sql, queryValues, (err, results) => {
                 if (err) {
@@ -51,11 +53,11 @@ async function insert(data, callback, socket) {
                     })
                     return
                 }
-                socket.broadcast.emit('/department/broadcast', 'success')
-                socket.emit('/department/broadcast', 'success')
+                socket.broadcast.emit('/users/broadcast', 'success')
+                socket.emit('/users/broadcast', 'success')
                 callback({
                     status: 'success',
-                    message: 'Department successfully created!'
+                    message: 'User successfully created!'
                 })
             })
             conn.release()
@@ -66,7 +68,7 @@ async function insert(data, callback, socket) {
 async function fetch(data, callback) {
     const {name, limit, offset} = data
     connection.getConnection((err, conn) => {
-        const sql = 'SELECT * FROM department LIMIT ? OFFSET ?';
+        const sql = 'SELECT * FROM users LIMIT ? OFFSET ?';
         const queryValues = [limit || 10, offset || 0]
         conn.query(sql, queryValues, (err, results) => {
             if (err) {
@@ -85,4 +87,26 @@ async function fetch(data, callback) {
     })
 }
 
-module.exports = DepartmentController
+async function fetchMemberDetail(data, callback) {
+    const {name, limit, offset} = data
+    connection.getConnection((err, conn) => {
+        const sql = 'SELECT * FROM users LIMIT ? OFFSET ?';
+        const queryValues = [limit || 10, offset || 0]
+        conn.query(sql, queryValues, (err, results) => {
+            if (err) {
+                callback({
+                    status: 'error',
+                    message: err.message
+                })
+                return
+            }
+            callback({
+                status: 'success',
+                data: results
+            })
+        })
+        conn.release()
+    })
+}
+
+module.exports = MemberController
