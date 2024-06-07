@@ -9,12 +9,14 @@ const EventController = (data, type, callback, socket) => {
         insert(data, callback, socket)
     } else if (type === "fetch") {
         fetch(data, callback)
+    } else if (type === "fetchWithDate") {
+        fetchWithDate(data, callback)
     }
 }
 
 async function insert(data, callback, socket) {
-    const { title, content, files, sessionID } = data
-    if (!title || !content) {
+    const { title, description, author, extraInfo, location, files, sessionID } = data
+    if (!title || !description) {
         callback({
             status: 'error',
             message: 'Required fields'
@@ -23,10 +25,10 @@ async function insert(data, callback, socket) {
     }
     connection.getConnection((err, conn) => {
         const sql = `INSERT INTO events 
-        (id, userID, amount, status, sessionID, createdAt) 
-        VALUES (?, ?, ?, ?, ?, ?)`
+        (id, title, description, author, images, extra_info, location, type, status, sessionID, createdAt) 
+        VALUES (?, ?, ?, ?, ?, ?, ? ,? ,?, ?, ?)`
         const queryValues = [
-            generateID(), memberID.split('**')[1], amount, 'active', sessionID ? sessionID : null, fullDateTime()
+            generateID(), title, description, 'Pastor Joseph', files, extraInfo, location, 'church', 'active', sessionID ? sessionID : null, fullDateTime()
         ]
         conn.query(sql, queryValues, (err, results) => {
             if (err) {
@@ -36,21 +38,117 @@ async function insert(data, callback, socket) {
                 })
                 return
             }
-            socket.broadcast.emit('/dues/broadcast', 'success')
-            socket.emit('/dues/broadcast', 'success')
+            socket.broadcast.emit('/event/broadcast', 'success')
+            socket.emit('/event/broadcast', 'success')
             callback({
                 status: 'success',
-                message: 'Dues added successfully!'
+                message: 'Event added successfully!'
             })
         })
         conn.release()
     })
 }
 
-async function fetch(data, callback) {
-    const {name, limit, offset} = data
+// async function fetchWithDate(data, callback) {
+//     const {name, limit, offset} = data
+//     connection.getConnection((err, conn) => {
+//         const sql = 'SELECT * FROM events LIMIT ? OFFSET ?';
+//         const queryValues = [limit || 10, offset || 0]
+//         conn.query(sql, queryValues, (err, results) => {
+//             if (err) {
+//                 callback({
+//                     status: 'error',
+//                     message: err.message
+//                 })
+//                 return
+//             }
+//             let resultOver = {}
+//             if (results.length > 0) {
+//                 for (let i = 0; i < results.length; i++) {
+//                     const item = results[i]
+//                     const dateTime = item.createdAt
+//                     let date = fullDate(dateTime)
+//                     if (!resultOver[date]) {
+//                         resultOver[date] = [item]
+//                     } else {
+//                         resultOver[date].push(item)
+//                     }
+//                 }
+//             }
+//             callback({
+//                 status: 'success',
+//                 data: resultOver
+//             })
+//         })
+//         conn.release()
+//     })
+// }
+async function fetchWithDate(data, callback) {
+    const { name, limit, offset } = data;
     connection.getConnection((err, conn) => {
-        const sql = 'SELECT * FROM dues LIMIT ? OFFSET ?';
+        const sql = 'SELECT * FROM events LIMIT ? OFFSET ?';
+        const queryValues = [limit || 10, offset || 0];
+        conn.query(sql, queryValues, (err, results) => {
+            if (err) {
+                callback({
+                    status: 'error',
+                    message: err.message
+                });
+                return;
+            }
+            
+            let resultOver = {};
+            let resultOverChurch = {};
+            let resultOverMember = {};
+
+            if (results.length > 0) {
+                for (let i = 0; i < results.length; i++) {
+                    const item = results[i];
+                    const dateTime = item.createdAt;
+                    const date = fullDate(dateTime);
+
+                    // Group by date
+                    if (!resultOver[date]) {
+                        resultOver[date] = [item];
+                    } else {
+                        resultOver[date].push(item);
+                    }
+
+                    // Group by event type
+                    if (item.type === 'church') {
+                        if (!resultOverChurch[date]) {
+                            resultOverChurch[date] = [item];
+                        } else {
+                            resultOverChurch[date].push(item);
+                        }
+                    } else if (item.type === 'member') {
+                        if (!resultOverMember[date]) {
+                            resultOverMember[date] = [item];
+                        } else {
+                            resultOverMember[date].push(item);
+                        }
+                    }
+                }
+            }
+
+            callback({
+                status: 'success',
+                data: {
+                    byDate: resultOver,
+                    byChurch: resultOverChurch,
+                    byMember: resultOverMember
+                }
+            });
+        });
+        conn.release();
+    });
+}
+
+
+async function fetch(data, callback) {
+    const {hiddenID, limit, offset} = data
+    connection.getConnection((err, conn) => {
+        const sql = `SELECT * FROM events ${hiddenID ? `WHERE events.id = ${hiddenID}` : ''} LIMIT ? OFFSET ?`;
         const queryValues = [limit || 10, offset || 0]
         conn.query(sql, queryValues, (err, results) => {
             if (err) {
@@ -60,22 +158,9 @@ async function fetch(data, callback) {
                 })
                 return
             }
-            let resultOver = {}
-            if (results.length > 0) {
-                for (let i = 0; i < results.length; i++) {
-                    const item = results[i]
-                    const dateTime = item.createdAt
-                    let date = fullDate(dateTime)
-                    if (!resultOver[date]) {
-                        resultOver[date] = [item]
-                    } else {
-                        resultOver[date].push(item)
-                    }
-                }
-            }
             callback({
                 status: 'success',
-                data: resultOver
+                data: results
             })
         })
         conn.release()

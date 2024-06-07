@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs')
 const dotenv = require('dotenv');
 const express = require('express');
 const cors = require('cors');
@@ -18,6 +19,7 @@ const SendEmailController = require('./controllers/main/SendEmail');
 const TithesController = require('./controllers/main/tithes');
 const OfferingsController = require('./controllers/main/Offerings');
 const multer = require('multer');
+const EventController = require('./controllers/main/Event');
 
 dotenv.config({ path: path.join(__dirname, `.env`) });
 
@@ -29,11 +31,12 @@ app.use(cors({
     methods: ['GET', 'POST', 'DELETE', 'PUT']
 }));
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
+app.use(bodyParser.json())
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/events/');
+        cb(null, 'uploads/');
     },
     filename: (req, file, cb) => {
         cb(null, `${Date.now()}_${file.originalname}`);
@@ -56,6 +59,56 @@ app.post('/register_user', (req, res) => {
     RegisterController(req, res);
 });
 
+
+app.get('/api/images/:id', (req, res) => {
+    const { id } = req.params
+    const imagePath = path.join(__dirname, 'uploads', id)
+    res.sendFile(imagePath, (err) => {
+        if (err) {
+            console.error('Error sending file:', err)
+            res.status(404).send('File not found')
+        }
+    })
+})
+
+app.get('/api/files/:id', (req, res) => {
+    const { id } = req.params;
+    const filePath = path.join(__dirname, 'uploads', id);
+
+    fs.stat(filePath, (err, stat) => {
+        if (err) {
+            console.error('File not found or error reading file:', err);
+            return res.status(404).send('File not found');
+        }
+
+        const fileSize = stat.size;
+        const range = req.headers.range;
+
+        if (range) {
+            const parts = range.replace(/bytes=/, "").split("-");
+            const start = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+            const chunksize = (end - start) + 1;
+            const file = fs.createReadStream(filePath, { start, end });
+            const head = {
+                'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                'Accept-Ranges': 'bytes',
+                'Content-Length': chunksize,
+                'Content-Type': 'video/mp4', // Adjust if necessary
+            };
+            res.writeHead(206, head);
+            file.pipe(res);
+        } else {
+            const head = {
+                'Content-Length': fileSize,
+                'Content-Type': 'video/mp4', // Adjust if necessary
+            };
+            res.writeHead(200, head);
+            fs.createReadStream(filePath).pipe(res);
+        }
+    })
+})
+
 app.post('/login_user', (req, res) => {
     LoginController(req, res);
 });
@@ -69,6 +122,8 @@ app.post('/change_user_password', (req, res) => {
     console.log('Received request to change user password');
     ChangePasswordController(req, res);
 });
+
+
 
 app.get('/', (req, res) => {
     res.status(200).json({
@@ -154,7 +209,6 @@ io.on('connection', (socket) => {
         SendEmailController(data, 'fetchEmail', callback, socket)
     })
     
-
     socket.on('/fetch-members', (data, callback) => {
         console.log('Received /fetch-users event')
         MemberController(data, 'fetch', callback)
@@ -163,6 +217,21 @@ io.on('connection', (socket) => {
     socket.on('/fetch-members-details', (data, callback) => {
         console.log('Received /fetch-users event')
         MemberController(data, 'fetchWithDetails', callback)
+    })
+
+    socket.on('/insert-update-event', (data, callback) => {
+        console.log('Received /insert-update-event event')
+        EventController(data, 'insert', callback, socket)
+    })
+
+    socket.on('/fetch-event-with-date', (data, callback) => {
+        console.log('Received /fetch-event event')
+        EventController(data, 'fetchWithDate', callback)
+    })
+
+    socket.on('/fetch-event', (data, callback) => {
+        console.log('Received /fetch-event event')
+        EventController(data, 'fetch', callback)
     })
 
 })
