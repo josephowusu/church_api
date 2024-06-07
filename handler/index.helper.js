@@ -26,7 +26,7 @@ const sendMail = async (subject, message, to) => {
     })
 
     let mailOptions = {
-        from: `CODIFY CENTRAL <${config.email}>`,
+        from: `ACCI <${config.email}>`,
         to: to,
         subject: subject,
         text: message,
