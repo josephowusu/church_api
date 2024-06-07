@@ -18,7 +18,7 @@ const CheckEmailController = (request, response) => {
                 })
             }
             if (results.length > 0) {
-                sendMail('Password Reset', 'Please click on link to reset your password http://localhost:3001/set_new_password', email)
+                sendMail('Password Reset', `Please click on link to reset your password http://13.50.101.210:3000/set_new_password/${email}`, email)
                 return response.status(200).json({
                     status: 'success',
                     message: 'Email sent for password reset!'

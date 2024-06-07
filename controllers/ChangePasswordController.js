@@ -2,7 +2,6 @@ const connection = require('./../model/connection')
 
 const ChangePasswordController = (request, response) => {
     const {email, password} = request.body
-    console.log(request.body)
     if (!email) {
         return response.status(200).json({
             status: "error",
