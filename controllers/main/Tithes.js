@@ -20,7 +20,7 @@ async function insert(data, callback, socket) {
             message: 'Required fields'
         })
         return
-    }
+    } 
     connection.getConnection((err, conn) => {
         const sql = `INSERT INTO tithes 
         (id, userID, amount, status, sessionID, createdAt) 
