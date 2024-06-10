@@ -12,8 +12,9 @@ const OrganisationController = (data, type, callback, socket) => {
 }
 
 async function insert(data, callback, socket) {
-    const {name, description, sessionID} = data
-    if (!name) {
+    const {userID, level, role, sessionID} = data
+
+    if (!userID || !level) {
         callback({
             status: 'error',
             message: 'Required fields'
@@ -22,7 +23,7 @@ async function insert(data, callback, socket) {
     }
     
     connection.getConnection((err, conn) => {
-        conn.query('SELECT * FROM organisation WHERE name = ?', [name], (error, results, fields) => {
+        conn.query('SELECT * FROM leadership WHERE userID = ?', [userID], (error, results, fields) => {
             if (error) {
                 callback({
                     status: 'error',
@@ -30,16 +31,32 @@ async function insert(data, callback, socket) {
                 })
             }
             if (results.length > 0) {
-                callback({
-                    status: 'error',
-                    message: 'Organisation already exists!'
+                const sql = `UPDATE leadership SET role = ?, level = ? WHERE leadership.userID = ?`
+                const queryValues = [
+                    role, level, userID
+                ]
+                conn.query(sql, queryValues, (err, results) => {
+                    if (err) {
+                        callback({
+                            status: 'error',
+                            message: err.message
+                        })
+                        return
+                    }
+                    socket.broadcast.emit('/leadership/broadcast', 'success')
+                    socket.emit('/leadership/broadcast', 'success')
+                    callback({
+                        status: 'success',
+                        message: 'Leadership successfully created!'
+                    })
                 })
+                return
             }
-            const sql = `INSERT INTO organisation 
-            (id, name, description, status, sessionID, createdAt) 
-            VALUES (?, ?, ?, ?, ?, ?)`
+            const sql = `INSERT INTO leadership 
+            (id, userID, role, level, status, sessionID, createdAt) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)`
             const queryValues = [
-                generateID(), name, description ? description : '', 'active', sessionID ? sessionID : null, fullDateTime()
+                generateID(), userID, role, level, 'active', sessionID ? sessionID : null, fullDateTime()
             ]
             conn.query(sql, queryValues, (err, results) => {
                 if (err) {
@@ -49,11 +66,11 @@ async function insert(data, callback, socket) {
                     })
                     return
                 }
-                socket.broadcast.emit('/organisation/broadcast', 'success')
-                socket.emit('/organisation/broadcast', 'success')
+                socket.broadcast.emit('/leadership/broadcast', 'success')
+                socket.emit('/leadership/broadcast', 'success')
                 callback({
                     status: 'success',
-                    message: 'Organisation successfully created!'
+                    message: 'Leadership successfully created!'
                 })
             })
             conn.release()
@@ -64,7 +81,7 @@ async function insert(data, callback, socket) {
 async function fetch(data, callback) {
     const {name, limit, offset} = data
     connection.getConnection((err, conn) => {
-        const sql = 'SELECT * FROM organisation LIMIT ? OFFSET ?';
+        const sql = 'SELECT * FROM leadership LEFT JOIN users ON users.id = leadership.userUD LIMIT ? OFFSET ?';
         const queryValues = [limit || 10, offset || 0]
         conn.query(sql, queryValues, (err, results) => {
             if (err) {
