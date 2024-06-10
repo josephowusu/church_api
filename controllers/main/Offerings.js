@@ -13,8 +13,8 @@ const OfferingsController = (data, type, callback, socket) => {
 }
 
 async function insert(data, callback, socket) {
-    const { memberID, amount, sessionID } = data
-    if (!memberID || !amount) {
+    const { branchID, amount, sessionID } = data
+    if (!branchID || !amount) {
         callback({
             status: 'error',
             message: 'Required fields'
@@ -23,10 +23,10 @@ async function insert(data, callback, socket) {
     }
     connection.getConnection((err, conn) => {
         const sql = `INSERT INTO offerings 
-        (id, userID, amount, status, sessionID, createdAt) 
+        (id, branchID, amount, status, sessionID, createdAt) 
         VALUES (?, ?, ?, ?, ?, ?)`
         const queryValues = [
-            generateID(), memberID.split('**')[1], amount, 'active', sessionID ? sessionID : null, fullDateTime()
+            generateID(), branchID, amount, 'active', sessionID ? sessionID : null, fullDateTime()
         ]
         conn.query(sql, queryValues, (err, results) => {
             if (err) {

@@ -20,6 +20,8 @@ const TithesController = require('./controllers/main/Tithes');
 const OfferingsController = require('./controllers/main/Offerings');
 const multer = require('multer');
 const EventController = require('./controllers/main/Event');
+const AttendanceController = require('./controllers/main/Attendance');
+const BranchesController = require('./controllers/main/Branches');
 
 dotenv.config({ path: path.join(__dirname, `.env`) });
 
@@ -185,7 +187,7 @@ io.on('connection', (socket) => {
     })
 
     socket.on('/insert-offerings', (data, callback) => {
-        console.log('Received /insert-update-organisation event');
+        console.log('Received /insert-update-offering event');
         OfferingsController(data, 'insert', callback, socket)
     })
 
@@ -232,6 +234,26 @@ io.on('connection', (socket) => {
     socket.on('/fetch-event', (data, callback) => {
         console.log('Received /fetch-event event')
         EventController(data, 'fetch', callback)
+    })
+
+    socket.on('/fetch-attendance', (data, callback) => {
+        console.log('Received /fetch-attendance event')
+        AttendanceController(data, 'fetch', callback)
+    })
+
+    socket.on('/mark-attendance', (data, callback) => {
+        console.log('Received /mark-attendance event')
+        AttendanceController(data, 'insert', callback, socket)
+    })
+
+    socket.on('/fetch-branch', (data, callback) => {
+        console.log('Received /fetch-branches event')
+        BranchesController(data, 'fetch', callback)
+    })
+
+    socket.on('/add-branch', (data, callback) => {
+        console.log('Received /add-branches event')
+        BranchesController(data, 'insert', callback, socket)
     })
 
 })

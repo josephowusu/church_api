@@ -3,9 +3,9 @@ const connection = require('./../model/connection')
 
 
 const RegisterController = (request, response) => {
-    const {firstname, othername, lastname, phone, email, password, session} = request.body
+    const {firstname, othername, lastname, phone, email, password, session, branchID} = request.body
     
-    if (!firstname || !lastname || !email || !phone || !password) {
+    if (!firstname || !lastname || !email || !phone || !password || !branchID) {
         response.status(200).json({
             status: "error",
             message: "Some fields are required!"
@@ -28,11 +28,11 @@ const RegisterController = (request, response) => {
                 })
             }
             const sql = `INSERT INTO users 
-            (id, departmentID, firstName, otherName, lastName, password, phone, email, type, status, sessionID, createdAt) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            (id, departmentID, firstName, otherName, lastName, password, phone, email, type, branchID, status, sessionID, createdAt) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
             const queryValues = [
                 generateID(), null, firstname, othername, lastname,
-                password, phone, email, 'member', 'active', session ? session : null, fullDateTime()
+                password, phone, email, 'member', branchID, 'active', session ? session : null, fullDateTime()
             ]
             conn.query(sql, queryValues, (err, results) => {
                 if (err) throw err

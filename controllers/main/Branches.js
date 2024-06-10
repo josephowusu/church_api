@@ -3,7 +3,7 @@
 const { generateID, fullDateTime } = require('../../model/helper')
 const connection = require('./../../model/connection')
 
-const DepartmentController = (data, type, callback, socket) => {
+const BranchesController = (data, type, callback, socket) => {
     if (type === "insert") {
         insert(data, callback, socket)
     } else if (type === "fetch") {
@@ -22,7 +22,7 @@ async function insert(data, callback, socket) {
         return
     }
     connection.getConnection((err, conn) => {
-        conn.query('SELECT * FROM department WHERE name = ?', [name], (error, results, fields) => {
+        conn.query('SELECT * FROM branches WHERE name = ?', [name], (error, results, fields) => {
             if (error) {
                 callback({
                     status: 'error',
@@ -37,7 +37,7 @@ async function insert(data, callback, socket) {
                 })
                 return
             }
-            const sql = `INSERT INTO department 
+            const sql = `INSERT INTO branches 
             (id, name, description, status, sessionID, createdAt) 
             VALUES (?, ?, ?, ?, ?, ?)`
             const queryValues = [
@@ -51,11 +51,11 @@ async function insert(data, callback, socket) {
                     })
                     return
                 }
-                socket.broadcast.emit('/department/broadcast', 'success')
-                socket.emit('/department/broadcast', 'success')
+                socket.broadcast.emit('/branches/broadcast', 'success')
+                socket.emit('/branches/broadcast', 'success')
                 callback({
                     status: 'success',
-                    message: 'Department successfully created!'
+                    message: 'branch successfully created!'
                 })
             })
             conn.release()
@@ -66,7 +66,7 @@ async function insert(data, callback, socket) {
 async function fetch(data, callback) {
     const {name, limit, offset} = data
     connection.getConnection((err, conn) => {
-        const sql = 'SELECT * FROM department LIMIT ? OFFSET ?';
+        const sql = 'SELECT * FROM branches LIMIT ? OFFSET ?';
         const queryValues = [limit || 10, offset || 0]
         conn.query(sql, queryValues, (err, results) => {
             if (err) {
@@ -85,4 +85,4 @@ async function fetch(data, callback) {
     })
 }
 
-module.exports = DepartmentController
+module.exports = BranchesController
