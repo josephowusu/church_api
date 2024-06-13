@@ -8,12 +8,14 @@ const DepartmentController = (data, type, callback, socket) => {
         insert(data, callback, socket)
     } else if (type === "fetch") {
         fetch(data, callback)
+    } else if (type === "fetchWithBranch") {
+        fetchWithBranch(data, callback)
     }
 }
 
 
 async function insert(data, callback, socket) {
-    const {name, description, sessionID} = data
+    const {name, description, sessionID, branchID} = data
     if (!name) {
         callback({
             status: 'error',
@@ -22,7 +24,7 @@ async function insert(data, callback, socket) {
         return
     }
     connection.getConnection((err, conn) => {
-        conn.query('SELECT * FROM department WHERE name = ?', [name], (error, results, fields) => {
+        conn.query('SELECT * FROM department WHERE name = ? AND branchID = ?', [name, branchID], (error, results, fields) => {
             if (error) {
                 callback({
                     status: 'error',
@@ -38,10 +40,10 @@ async function insert(data, callback, socket) {
                 return
             }
             const sql = `INSERT INTO department 
-            (id, name, description, status, sessionID, createdAt) 
-            VALUES (?, ?, ?, ?, ?, ?)`
+            (id, name, description, branchID, status, sessionID, createdAt) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)`
             const queryValues = [
-                generateID(), name, description ? description : '', 'active', sessionID ? sessionID : null, fullDateTime()
+                generateID(), name, description ? description : '', branchID, 'active', sessionID ? sessionID : null, fullDateTime()
             ]
             conn.query(sql, queryValues, (err, results) => {
                 if (err) {
@@ -63,11 +65,70 @@ async function insert(data, callback, socket) {
     })
 }
 
+async function fetchWithBranch(data, callback) {
+    const { name, limit, offset, branchID } = data
+    connection.getConnection((err, conn) => {
+        if (err) {
+            callback({
+                status: 'error',
+                message: err.message
+            });
+            return;
+        }
+
+        const branchLevelSql = 'SELECT level FROM branches WHERE id = ?';
+        conn.query(branchLevelSql, [branchID], (err, branchResults) => {
+            if (err || branchResults.length === 0) {
+                callback({
+                    status: 'error',
+                    message: err ? err.message : 'Branch not found'
+                })
+                conn.release();
+                return;
+            }
+            const branchLevel = branchResults[0].level;
+            const branchesSql = 'SELECT id FROM branches WHERE level = ?';
+            conn.query(branchesSql, [branchLevel], (err, branchesResults) => {
+                if (err) {
+                    callback({
+                        status: 'error',
+                        message: err.message
+                    });
+                    conn.release();
+                    return;
+                }
+                const branchIDs = branchesResults.map(branch => branch.id)
+                const attendanceSql = `
+                    SELECT * FROM department 
+                    WHERE branchID IN (?) 
+                    ORDER BY createdAt DESC 
+                    LIMIT ? OFFSET ?`;
+                const queryValues = [branchIDs, limit || 10, offset || 0];
+                conn.query(attendanceSql, queryValues, (err, results) => {
+                    if (err) {
+                        callback({
+                            status: 'error',
+                            message: err.message
+                        });
+                        conn.release();
+                        return;
+                    }
+                    callback({
+                        status: 'success',
+                        data: results
+                    })
+                    conn.release();
+                });
+            });
+        });
+    });
+}
+
 async function fetch(data, callback) {
     const {name, limit, offset} = data
     connection.getConnection((err, conn) => {
         const sql = 'SELECT * FROM department LIMIT ? OFFSET ?';
-        const queryValues = [limit || 10, offset || 0]
+        const queryValues = [limit || 6, offset || 0]
         conn.query(sql, queryValues, (err, results) => {
             if (err) {
                 callback({

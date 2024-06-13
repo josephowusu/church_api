@@ -156,14 +156,32 @@ io.on('connection', (socket) => {
         DepartmentController(data, 'fetch', callback)
     })
 
-    socket.on('/insert-update-organisation', (data, callback) => {
+    socket.on('/fetch-department-min', (data, callback) => {
+        console.log('Received /fetch-department event');
+        DepartmentController(data, 'fetchWithBranch', callback)
+    })
+
+    socket.on('/insert-update-leadership', (data, callback) => {
         console.log('Received /insert-update-organisation event');
         OrganisationController(data, 'insert', callback, socket)
     })
 
-    socket.on('/fetch-organisation', (data, callback) => {
+    socket.on('/fetch-leadership', (data, callback) => {
         console.log('Received /fetch-department event');
         OrganisationController(data, 'fetch', callback)
+    })
+
+    socket.on('/fetch-level', (data, callback) => {
+        console.log('Received /fetch-level event');
+        let levels = [
+            {id: 1, level: 'Head Office'},
+            {id: 2, level: 'District'},
+            {id: 3, level: 'Branch'},
+        ]
+        callback({
+            status: 'success',
+            data: levels
+        })
     })
 
     socket.on('/insert-dues', (data, callback) => {
@@ -254,6 +272,11 @@ io.on('connection', (socket) => {
     socket.on('/add-branch', (data, callback) => {
         console.log('Received /add-branches event')
         BranchesController(data, 'insert', callback, socket)
+    })
+
+    socket.on('/fetch-branches', (data, callback) => {
+        console.log('Received /fetch-branches event')
+        BranchesController(data, 'fetchBranches', callback)
     })
 
 })

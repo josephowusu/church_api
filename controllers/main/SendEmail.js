@@ -13,8 +13,8 @@ const SendEmailController = (data, type, callback, socket) => {
 }
 
 const send = async (data, callback, socket) => {
-    const { departmentID, message, subject, sessionID } = data
-    if (!departmentID || !message || message === "undefined") {
+    const { message, subject, sessionID, selectedBranchID } = data
+    if (!message || message === "undefined" || !selectedBranchID) {
         callback({
             status: 'error',
             message: 'Some fields are missing!'
@@ -22,9 +22,9 @@ const send = async (data, callback, socket) => {
         return
     }
     try {
-        let id = departmentID ? departmentID.split('**')[1]: null
+        let id = selectedBranchID ? selectedBranchID.split('**')[1]: null
         connection.getConnection((err, conn) => {
-            conn.query('SELECT * FROM users WHERE departmentID = ?', [id], async (error, results, fields) => {
+            conn.query('SELECT * FROM users WHERE branchID = ?', [id], async (error, results, fields) => {
                 if (error) {
                     callback({
                         status: 'error',
@@ -40,6 +40,7 @@ const send = async (data, callback, socket) => {
                 }
                 let success = 0, fails = 0
                 if (contacts.length > 0) {
+                    console.log(contacts)
                    for (let j = 0; j < contacts.length; j++) {
                         const contact = contacts[j]
                         if (contact.email) {
@@ -55,10 +56,10 @@ const send = async (data, callback, socket) => {
                         }
                     }
                     const sql = `INSERT INTO emails 
-                    (id, subject, message, sent_status, status, sessionID, createdAt) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?)`
+                    (id, subject, message, sent_status, branchID, status, sessionID, createdAt) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
                     const queryValues = [
-                        generateID(), subject, message, `sents ${success}, fails ${fails}`, 'active', sessionID ? sessionID : null, fullDateTime()
+                        generateID(), subject, message, `sents ${success}, fails ${fails}`, id, 'active', sessionID ? sessionID : null, fullDateTime()
                     ]
                     conn.query(sql, queryValues, (err, results) => {
                         if (err) {

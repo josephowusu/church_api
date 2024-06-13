@@ -14,16 +14,17 @@ const OrganisationController = (data, type, callback, socket) => {
 async function insert(data, callback, socket) {
     const {userID, level, role, sessionID} = data
 
-    if (!userID || !level) {
+    if (!userID || !level || !role) {
         callback({
             status: 'error',
             message: 'Required fields'
         })
         return
     }
-    
+    let userid = userID ? userID.split('**')[1] : 0
+    let lvl = level ? level.split('**')[1] : ''
     connection.getConnection((err, conn) => {
-        conn.query('SELECT * FROM leadership WHERE userID = ?', [userID], (error, results, fields) => {
+        conn.query('SELECT * FROM leadership WHERE userID = ?', [userid], (error, results, fields) => {
             if (error) {
                 callback({
                     status: 'error',
@@ -33,7 +34,7 @@ async function insert(data, callback, socket) {
             if (results.length > 0) {
                 const sql = `UPDATE leadership SET role = ?, level = ? WHERE leadership.userID = ?`
                 const queryValues = [
-                    role, level, userID
+                    role, lvl, userid
                 ]
                 conn.query(sql, queryValues, (err, results) => {
                     if (err) {
@@ -56,7 +57,7 @@ async function insert(data, callback, socket) {
             (id, userID, role, level, status, sessionID, createdAt) 
             VALUES (?, ?, ?, ?, ?, ?, ?)`
             const queryValues = [
-                generateID(), userID, role, level, 'active', sessionID ? sessionID : null, fullDateTime()
+                generateID(), userid, role, lvl, 'active', sessionID ? sessionID : null, fullDateTime()
             ]
             conn.query(sql, queryValues, (err, results) => {
                 if (err) {
@@ -81,7 +82,7 @@ async function insert(data, callback, socket) {
 async function fetch(data, callback) {
     const {name, limit, offset} = data
     connection.getConnection((err, conn) => {
-        const sql = 'SELECT * FROM leadership LEFT JOIN users ON users.id = leadership.userUD LIMIT ? OFFSET ?';
+        const sql = 'SELECT * FROM leadership LEFT JOIN users ON users.id = leadership.userID ORDER BY level ASC LIMIT ? OFFSET ?';
         const queryValues = [limit || 10, offset || 0]
         conn.query(sql, queryValues, (err, results) => {
             if (err) {

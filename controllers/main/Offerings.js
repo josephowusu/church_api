@@ -48,38 +48,111 @@ async function insert(data, callback, socket) {
 }
 
 async function fetch(data, callback) {
-    const {name, limit, offset} = data
+    const { name, limit, offset, branchID } = data
     connection.getConnection((err, conn) => {
-        const sql = 'SELECT * FROM offerings LIMIT ? OFFSET ?';
-        const queryValues = [limit || 10, offset || 0]
-        conn.query(sql, queryValues, (err, results) => {
-            if (err) {
+        if (err) {
+            callback({
+                status: 'error',
+                message: err.message
+            });
+            return;
+        }
+
+        const branchLevelSql = 'SELECT level FROM branches WHERE id = ?';
+        conn.query(branchLevelSql, [branchID], (err, branchResults) => {
+            if (err || branchResults.length === 0) {
                 callback({
                     status: 'error',
-                    message: err.message
+                    message: err ? err.message : 'Branch not found'
                 })
-                return
+                conn.release();
+                return;
             }
-            let resultOver = {}
-            if (results.length > 0) {
-                for (let i = 0; i < results.length; i++) {
-                    const item = results[i]
-                    const dateTime = item.createdAt
-                    let date = fullDate(dateTime)
-                    if (!resultOver[date]) {
-                        resultOver[date] = [item]
-                    } else {
-                        resultOver[date].push(item)
-                    }
+            const branchLevel = branchResults[0].level;
+            const branchesSql = 'SELECT id FROM branches WHERE level = ?';
+            conn.query(branchesSql, [branchLevel], (err, branchesResults) => {
+                if (err) {
+                    callback({
+                        status: 'error',
+                        message: err.message
+                    });
+                    conn.release();
+                    return;
                 }
-            }
-            callback({
-                status: 'success',
-                data: resultOver
-            })
-        })
-        conn.release()
-    })
+                const branchIDs = branchesResults.map(branch => branch.id)
+                const attendanceSql = `
+                    SELECT branches.*, offerings.* FROM offerings
+                    LEFT JOIN branches ON branches.id = offerings.branchID 
+                    WHERE offerings.branchID IN (?) 
+                    ORDER BY offerings.createdAt DESC 
+                    LIMIT ? OFFSET ?`;
+                const queryValues = [branchIDs, limit || 10, offset || 0];
+                conn.query(attendanceSql, queryValues, (err, results) => {
+                    if (err) {
+                        callback({
+                            status: 'error',
+                            message: err.message
+                        });
+                        conn.release();
+                        return;
+                    }
+                    let resultOver = {}
+                    if (results.length > 0) {
+                        for (let i = 0; i < results.length; i++) {
+                            const item = results[i]
+                            const dateTime = item.createdAt
+                            let date = fullDate(dateTime)
+                            if (!resultOver[date]) {
+                                resultOver[date] = [item]
+                            } else {
+                                resultOver[date].push(item)
+                            }
+                        }
+                    }
+                    callback({
+                        status: 'success',
+                        data: resultOver
+                    })
+                    conn.release();
+                });
+            });
+        });
+    });
 }
+
+// async function fetch(data, callback) {
+//     const {name, limit, offset} = data
+//     connection.getConnection((err, conn) => {
+//         const sql = 'SELECT * FROM offerings LIMIT ? OFFSET ?';
+//         const queryValues = [limit || 10, offset || 0]
+//         conn.query(sql, queryValues, (err, results) => {
+//             if (err) {
+//                 callback({
+//                     status: 'error',
+//                     message: err.message
+//                 })
+//                 return
+//             }
+//             let resultOver = {}
+//             if (results.length > 0) {
+//                 for (let i = 0; i < results.length; i++) {
+//                     const item = results[i]
+//                     const dateTime = item.createdAt
+//                     let date = fullDate(dateTime)
+//                     if (!resultOver[date]) {
+//                         resultOver[date] = [item]
+//                     } else {
+//                         resultOver[date].push(item)
+//                     }
+//                 }
+//             }
+//             callback({
+//                 status: 'success',
+//                 data: resultOver
+//             })
+//         })
+//         conn.release()
+//     })
+// }
 
 module.exports = OfferingsController

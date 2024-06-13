@@ -12,13 +12,13 @@ const AttendanceController = (data, type, callback, socket) => {
 }
 
 async function insert(data, callback, socket) {
-    const {men, women, children, sessionID} = data
+    const {men, women, children, branchID, sessionID} = data
     
     const sql = `INSERT INTO attendance 
-    (id, men, women, children, status, sessionID, createdAt) 
-    VALUES (?, ?, ?, ?, ?, ?, ?)`
+    (id, men, women, children, branchID, status, sessionID, createdAt) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     const queryValues = [
-        generateID(), men ? men : 0, women ? women : 0, children ? children : 0, 'active', sessionID ? sessionID : null, fullDateTime()
+        generateID(), men ? men : 0, women ? women : 0, children ? children : 0, branchID, 'active', sessionID ? sessionID : null, fullDateTime()
     ]
     connection.getConnection((err, conn) => {
         conn.query(sql, queryValues, (err, results) => {
@@ -41,25 +41,63 @@ async function insert(data, callback, socket) {
 }
 
 async function fetch(data, callback) {
-    const {name, limit, offset} = data
+    const { name, limit, offset, branchID } = data
     connection.getConnection((err, conn) => {
-        const sql = 'SELECT * FROM attendance ORDER BY createdAt DESC LIMIT ? OFFSET ?';
-        const queryValues = [limit || 10, offset || 0]
-        conn.query(sql, queryValues, (err, results) => {
-            if (err) {
+        if (err) {
+            callback({
+                status: 'error',
+                message: err.message
+            });
+            return;
+        }
+
+        const branchLevelSql = 'SELECT level FROM branches WHERE id = ?';
+        conn.query(branchLevelSql, [branchID], (err, branchResults) => {
+            if (err || branchResults.length === 0) {
                 callback({
                     status: 'error',
-                    message: err.message
+                    message: err ? err.message : 'Branch not found'
                 })
-                return
+                conn.release();
+                return;
             }
-            callback({
-                status: 'success',
-                data: results
-            })
-        })
-        conn.release()
-    })
+            const branchLevel = branchResults[0].level;
+            const branchesSql = 'SELECT id FROM branches WHERE level >= ?';
+            conn.query(branchesSql, [branchLevel], (err, branchesResults) => {
+                if (err) {
+                    callback({
+                        status: 'error',
+                        message: err.message
+                    });
+                    conn.release();
+                    return;
+                }
+                const branchIDs = branchesResults.map(branch => branch.id)
+                const attendanceSql = `
+                    SELECT * FROM attendance 
+                    WHERE branchID IN (?) 
+                    ORDER BY createdAt DESC 
+                    LIMIT ? OFFSET ?`;
+                const queryValues = [branchIDs, limit || 10, offset || 0];
+                conn.query(attendanceSql, queryValues, (err, results) => {
+                    if (err) {
+                        callback({
+                            status: 'error',
+                            message: err.message
+                        });
+                        conn.release();
+                        return;
+                    }
+                    callback({
+                        status: 'success',
+                        data: results
+                    });
+                    conn.release();
+                });
+            });
+        });
+    });
 }
+
 
 module.exports = AttendanceController

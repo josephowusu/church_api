@@ -13,8 +13,8 @@ const DuesController = (data, type, callback, socket) => {
 }
 
 async function insert(data, callback, socket) {
-    const { memberID, amount, sessionID } = data
-    if (!memberID || !amount) {
+    const { memberID, amount, sessionID, branchID } = data
+    if (!memberID || !amount | !branchID) {
         callback({
             status: 'error',
             message: 'Required fields'
@@ -23,10 +23,10 @@ async function insert(data, callback, socket) {
     }
     connection.getConnection((err, conn) => {
         const sql = `INSERT INTO dues 
-        (id, userID, amount, status, sessionID, createdAt) 
-        VALUES (?, ?, ?, ?, ?, ?)`
+        (id, userID, amount, branchID, status, sessionID, createdAt) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)`
         const queryValues = [
-            generateID(), memberID.split('**')[1], amount, 'active', sessionID ? sessionID : null, fullDateTime()
+            generateID(), memberID.split('**')[1], amount, branchID, 'active', sessionID ? sessionID : null, fullDateTime()
         ]
         conn.query(sql, queryValues, (err, results) => {
             if (err) {
@@ -48,38 +48,78 @@ async function insert(data, callback, socket) {
 }
 
 async function fetch(data, callback) {
-    const {name, limit, offset} = data
+    const { name, limit, offset, branchID } = data
     connection.getConnection((err, conn) => {
-        const sql = 'SELECT * FROM dues LIMIT ? OFFSET ?';
-        const queryValues = [limit || 10, offset || 0]
-        conn.query(sql, queryValues, (err, results) => {
-            if (err) {
+        if (err) {
+            callback({
+                status: 'error',
+                message: err.message
+            });
+            return;
+        }
+
+        const branchLevelSql = 'SELECT level FROM branches WHERE id = ?';
+        conn.query(branchLevelSql, [branchID], (err, branchResults) => {
+            if (err || branchResults.length === 0) {
                 callback({
                     status: 'error',
-                    message: err.message
+                    message: err ? err.message : 'Branch not found'
                 })
-                return
+                conn.release();
+                return;
             }
-            let resultOver = {}
-            if (results.length > 0) {
-                for (let i = 0; i < results.length; i++) {
-                    const item = results[i]
-                    const dateTime = item.createdAt
-                    let date = fullDate(dateTime)
-                    if (!resultOver[date]) {
-                        resultOver[date] = [item]
-                    } else {
-                        resultOver[date].push(item)
-                    }
+            const branchLevel = branchResults[0].level;
+            const branchesSql = 'SELECT id FROM branches WHERE level = ?';
+            conn.query(branchesSql, [branchLevel], (err, branchesResults) => {
+                if (err) {
+                    callback({
+                        status: 'error',
+                        message: err.message
+                    });
+                    conn.release();
+                    return;
                 }
-            }
-            callback({
-                status: 'success',
-                data: resultOver
-            })
-        })
-        conn.release()
-    })
+                const branchIDs = branchesResults.map(branch => branch.id)
+                const attendanceSql = `
+                    SELECT users.*, branches.*, dues.* FROM dues
+                    LEFT JOIN users ON users.id = dues.userID 
+                    LEFT JOIN branches ON branches.id = dues.branchID 
+                    WHERE dues.branchID IN (?) 
+                    ORDER BY dues.createdAt DESC 
+                    LIMIT ? OFFSET ?`;
+                const queryValues = [branchIDs, limit || 10, offset || 0];
+                conn.query(attendanceSql, queryValues, (err, results) => {
+                    if (err) {
+                        callback({
+                            status: 'error',
+                            message: err.message
+                        });
+                        conn.release();
+                        return;
+                    }
+                    let resultOver = {}
+                    if (results.length > 0) {
+                        for (let i = 0; i < results.length; i++) {
+                            const item = results[i]
+                            const dateTime = item.createdAt
+                            let date = fullDate(dateTime)
+                            if (!resultOver[date]) {
+                                resultOver[date] = [item]
+                            } else {
+                                resultOver[date].push(item)
+                            }
+                        }
+                    }
+                    callback({
+                        status: 'success',
+                        data: resultOver
+                    })
+                    conn.release();
+                });
+            });
+        });
+    });
 }
+
 
 module.exports = DuesController

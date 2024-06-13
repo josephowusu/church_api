@@ -65,48 +65,153 @@ async function insert(data, callback, socket) {
     })
 }
 
+// async function fetch(data, callback) {
+//     const {name, limit, offset} = data
+//     connection.getConnection((err, conn) => {
+//         const sql = 'SELECT * FROM users LIMIT ? OFFSET ?';
+//         const queryValues = [limit || 10, offset || 0]
+//         conn.query(sql, queryValues, (err, results) => {
+//             if (err) {
+//                 callback({
+//                     status: 'error',
+//                     message: err.message
+//                 })
+//                 return
+//             }
+//             callback({
+//                 status: 'success',
+//                 data: results
+//             })
+//         })
+//         conn.release()
+//     })
+// }
+
 async function fetch(data, callback) {
-    const {name, limit, offset} = data
+    const { name, limit, offset, branchID } = data
     connection.getConnection((err, conn) => {
-        const sql = 'SELECT * FROM users LIMIT ? OFFSET ?';
-        const queryValues = [limit || 10, offset || 0]
-        conn.query(sql, queryValues, (err, results) => {
-            if (err) {
+        if (err) {
+            callback({
+                status: 'error',
+                message: err.message
+            });
+            return;
+        }
+
+        const branchLevelSql = 'SELECT level FROM branches WHERE id = ?';
+        conn.query(branchLevelSql, [branchID], (err, branchResults) => {
+            if (err || branchResults.length === 0) {
                 callback({
                     status: 'error',
-                    message: err.message
+                    message: err ? err.message : 'Branch not found'
                 })
-                return
+                conn.release();
+                return;
             }
-            callback({
-                status: 'success',
-                data: results
-            })
-        })
-        conn.release()
-    })
+            const branchLevel = branchResults[0].level;
+            const branchesSql = 'SELECT id FROM branches WHERE level = ?';
+            conn.query(branchesSql, [branchLevel], (err, branchesResults) => {
+                if (err) {
+                    callback({
+                        status: 'error',
+                        message: err.message
+                    });
+                    conn.release();
+                    return;
+                }
+                const branchIDs = branchesResults.map(branch => branch.id)
+                const attendanceSql = `
+                    SELECT * 
+                    FROM users 
+                    WHERE users.branchID IN (?) 
+                    ORDER BY users.createdAt DESC 
+                    LIMIT ? OFFSET ?`;
+                const queryValues = [branchIDs, limit || 10, offset || 0];
+                conn.query(attendanceSql, queryValues, (err, results) => {
+                    if (err) {
+                        callback({
+                            status: 'error',
+                            message: err.message
+                        });
+                        conn.release();
+                        return;
+                    }
+                    callback({
+                        status: 'success',
+                        data: results
+                    });
+                    conn.release();
+                });
+            });
+        });
+    });
 }
 
 async function fetchMemberDetail(data, callback) {
-    const {name, limit, offset} = data
+    const { name, limit, offset, branchID } = data
     connection.getConnection((err, conn) => {
-        const sql = 'SELECT * FROM users LIMIT ? OFFSET ?';
-        const queryValues = [limit || 10, offset || 0]
-        conn.query(sql, queryValues, (err, results) => {
-            if (err) {
+        if (err) {
+            callback({
+                status: 'error',
+                message: err.message
+            });
+            return;
+        }
+
+        const branchLevelSql = 'SELECT level FROM branches WHERE id = ?';
+        conn.query(branchLevelSql, [branchID], (err, branchResults) => {
+            if (err || branchResults.length === 0) {
                 callback({
                     status: 'error',
-                    message: err.message
+                    message: err ? err.message : 'Branch not found'
                 })
-                return
+                conn.release();
+                return;
             }
-            callback({
-                status: 'success',
-                data: results
-            })
-        })
-        conn.release()
-    })
+            const branchLevel = branchResults[0].level;
+            const branchesSql = 'SELECT id FROM branches WHERE level = ?';
+            conn.query(branchesSql, [branchLevel], (err, branchesResults) => {
+                if (err) {
+                    callback({
+                        status: 'error',
+                        message: err.message
+                    });
+                    conn.release();
+                    return;
+                }
+                const branchIDs = branchesResults.map(branch => branch.id)
+                const attendanceSql = `
+                    SELECT 
+                    SUM(COALESCE(dues.amount, 0)) AS totalDues,
+                    SUM(COALESCE(tithes.amount, 0)) AS totalTithes, 
+                    tithes.*, 
+                    users.*
+                    FROM users
+                    LEFT JOIN dues ON dues.userID = users.id
+                    LEFT JOIN tithes ON tithes.userID = users.id
+                    WHERE users.branchID IN (?) 
+                    GROUP BY users.id
+                    ORDER BY users.createdAt DESC 
+                    LIMIT ? OFFSET ?`;
+                const queryValues = [branchIDs, limit || 10, offset || 0];
+                conn.query(attendanceSql, queryValues, (err, results) => {
+                    if (err) {
+                        callback({
+                            status: 'error',
+                            message: err.message
+                        });
+                        conn.release();
+                        return;
+                    }
+                    callback({
+                        status: 'success',
+                        data: results
+                    });
+                    conn.release();
+                });
+            });
+        });
+    });
 }
 
 module.exports = MemberController
