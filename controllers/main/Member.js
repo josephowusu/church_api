@@ -148,7 +148,7 @@ async function fetch(data, callback) {
 }
 
 async function fetchMemberDetail(data, callback) {
-    const { name, limit, offset, branchID } = data
+    const { name, limit, offset, branchID } = data;
     connection.getConnection((err, conn) => {
         if (err) {
             callback({
@@ -164,12 +164,12 @@ async function fetchMemberDetail(data, callback) {
                 callback({
                     status: 'error',
                     message: err ? err.message : 'Branch not found'
-                })
+                });
                 conn.release();
                 return;
             }
             const branchLevel = branchResults[0].level;
-            const branchesSql = 'SELECT id FROM branches WHERE level = ?';
+            const branchesSql = 'SELECT id FROM branches WHERE level <= ?';
             conn.query(branchesSql, [branchLevel], (err, branchesResults) => {
                 if (err) {
                     callback({
@@ -179,19 +179,35 @@ async function fetchMemberDetail(data, callback) {
                     conn.release();
                     return;
                 }
-                const branchIDs = branchesResults.map(branch => branch.id)
+                const branchIDs = branchesResults.map(branch => branch.id);
                 const attendanceSql = `
                     SELECT 
-                    SUM(COALESCE(dues.amount, 0)) AS totalDues,
-                    SUM(COALESCE(tithes.amount, 0)) AS totalTithes, 
-                    tithes.*, 
-                    users.*
+                        users.id,
+                        users.firstName,
+                        users.otherName,
+                        users.lastName,
+                        users.email,
+                        users.phone,
+                        users.createdAt,
+                        users.branchID,
+                        COALESCE(dues_sum.amount, 0) AS totalDues,
+                        COALESCE(tithes_sum.amount, 0) AS totalTithes,
+                        branches.name AS branchName
                     FROM users
-                    LEFT JOIN dues ON dues.userID = users.id
-                    LEFT JOIN tithes ON tithes.userID = users.id
-                    WHERE users.branchID IN (?) 
+                    LEFT JOIN (
+                        SELECT userID, SUM(amount) AS amount
+                        FROM dues
+                        GROUP BY userID
+                    ) AS dues_sum ON dues_sum.userID = users.id
+                    LEFT JOIN (
+                        SELECT userID, SUM(amount) AS amount
+                        FROM tithes
+                        GROUP BY userID
+                    ) AS tithes_sum ON tithes_sum.userID = users.id
+                     LEFT JOIN branches ON users.branchID = branches.id
+                    WHERE users.branchID IN (?)
                     GROUP BY users.id
-                    ORDER BY users.createdAt DESC 
+                    ORDER BY users.createdAt DESC
                     LIMIT ? OFFSET ?`;
                 const queryValues = [branchIDs, limit || 10, offset || 0];
                 conn.query(attendanceSql, queryValues, (err, results) => {
@@ -213,5 +229,73 @@ async function fetchMemberDetail(data, callback) {
         });
     });
 }
+
+
+// async function fetchMemberDetail(data, callback) {
+//     const { name, limit, offset, branchID } = data
+//     connection.getConnection((err, conn) => {
+//         if (err) {
+//             callback({
+//                 status: 'error',
+//                 message: err.message
+//             });
+//             return;
+//         }
+
+//         const branchLevelSql = 'SELECT level FROM branches WHERE id = ?';
+//         conn.query(branchLevelSql, [branchID], (err, branchResults) => {
+//             if (err || branchResults.length === 0) {
+//                 callback({
+//                     status: 'error',
+//                     message: err ? err.message : 'Branch not found'
+//                 })
+//                 conn.release();
+//                 return;
+//             }
+//             const branchLevel = branchResults[0].level;
+//             const branchesSql = 'SELECT id FROM branches WHERE level = ?';
+//             conn.query(branchesSql, [branchLevel], (err, branchesResults) => {
+//                 if (err) {
+//                     callback({
+//                         status: 'error',
+//                         message: err.message
+//                     });
+//                     conn.release();
+//                     return;
+//                 }
+//                 const branchIDs = branchesResults.map(branch => branch.id)
+//                 const attendanceSql = `
+//                     SELECT 
+//                     SUM(COALESCE(dues.amount, 0)) AS totalDues,
+//                     SUM(COALESCE(tithes.amount, 0)) AS totalTithes, 
+//                     tithes.*, 
+//                     users.*
+//                     FROM users
+//                     LEFT JOIN dues ON dues.userID = users.id
+//                     LEFT JOIN tithes ON tithes.userID = users.id
+//                     WHERE users.branchID IN (?) 
+//                     GROUP BY users.id
+//                     ORDER BY users.createdAt DESC 
+//                     LIMIT ? OFFSET ?`;
+//                 const queryValues = [branchIDs, limit || 10, offset || 0];
+//                 conn.query(attendanceSql, queryValues, (err, results) => {
+//                     if (err) {
+//                         callback({
+//                             status: 'error',
+//                             message: err.message
+//                         });
+//                         conn.release();
+//                         return;
+//                     }
+//                     callback({
+//                         status: 'success',
+//                         data: results
+//                     });
+//                     conn.release();
+//                 });
+//             });
+//         });
+//     });
+// }
 
 module.exports = MemberController
